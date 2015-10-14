@@ -1,0 +1,51 @@
+@model Umbraco.Forms.Mvc.Models.FieldViewModel        
+@{
+    string val = string.Empty;
+    if (Model.ValueAsObject != null && Model.ValueAsObject != "")
+    {
+        DateTime d;
+        d = (DateTime) Model.ValueAsObject;
+        val = d.ToShortDateString();
+    }
+}
+<script type="text/javascript">
+$(document).ready(function() { 
+   var dp1 = new datepicker('dp1_@Model.Id', '@Model.Id', true, 'cal_@Model.Id', 'bn_prev_@Model.Id','bn_next_@Model.Id','month_@Model.Id');
+   
+   $('#bn_date_@Model.Id').click(function(e) {
+      dp1.showDlg();
+
+      e.stopPropagation();
+      return false;
+   });
+});
+</script>
+
+   <input id="@Model.Id" type="text" name="@Model.Name" value="@val" @{if (Model.Mandatory) {<text> data-val="true" data-val-required="@Model.RequiredErrorMessage"</text>}}/>
+   <button id="bn_date_@Model.Id">Select Date...</button> 
+   <div id="dp1_@Model.Id" class="datepicker" aria-hidden="true">
+      <div class="month-wrap">
+         <div id="bn_prev_@Model.Id" class="bn_prev" role="button" aria-labelledby="bn_prev-label" tabindex="0"><img class="bn_img" src="http://www.oaa-accessibility.org/media/examples/images/prev.png" alt="<<"/></div>
+         <div id="month_@Model.Id" class="month" role="heading" aria-live="assertive" aria-atomic="true">February 2011</div>
+         <div id="bn_next_@Model.Id" class="bn_next" role="button" aria-labelledby="bn_next-label" tabindex="0"><img class="bn_img" src="http://www.oaa-accessibility.org/media/examples/images/next.png" alt=">>"/></div>
+      </div>
+      <table id="cal_@Model.Id" class="cal wcagpicker" role="grid" aria-activedescendant="errMsg" aria-labelledby="month" tabindex="0">
+         <thead>
+            <tr id="weekdays">
+               <th id="Sunday"><abbr title="Sunday">Su</abbr></th>
+               <th id="Monday"><abbr title="Monday">Mo</abbr></th>
+               <th id="Tuesday"><abbr title="Tuesday">Tu</abbr></th>
+               <th id="Wednesday"><abbr title="Wednesday">We</abbr></th>
+               <th id="Thursday"><abbr title="Thursday">Th</abbr></th>
+               <th id="Friday"><abbr title="Friday">Fr</abbr></th>
+               <th id="Saturday"><abbr title="Saturday">Sa</abbr></th>
+            </tr>
+         </thead>
+         <tbody>
+            <tr><td id="errMsg" colspan="7">Javascript must be enabled</td></tr>
+         </tbody>
+      </table>
+      <div id="bn_prev-label" class="offscreen">Go to previous month</div>
+      <div id="bn_next-label" class="offscreen">Go to next month</div>
+   </div>
+   </div>
