@@ -29,7 +29,7 @@ namespace Centennial.DAL
 
         #region Properties
 
-
+        
 
         /// <summary>
         /// Gets or sets Email.
@@ -81,8 +81,8 @@ namespace Centennial.DAL
 
         public override WorkflowExecutionStatus Execute(Record record, RecordEventArgs e)
         {
-
-            MailAddress FromMailAddress;
+            
+                MailAddress FromMailAddress;
             if (string.IsNullOrEmpty(this.FromEmail))
             {
                 var settings = UmbracoConfig.For.UmbracoSettings();
@@ -182,7 +182,7 @@ namespace Centennial.DAL
             }
 
             smtpClient.Send(mailMessage);
-
+            
 
 
             return WorkflowExecutionStatus.Completed;
@@ -198,7 +198,7 @@ namespace Centennial.DAL
         public override List<Exception> ValidateSettings()
         {
             var exceptions = new List<Exception>();
-
+           
 
             if (string.IsNullOrEmpty(this.Email))
             {
