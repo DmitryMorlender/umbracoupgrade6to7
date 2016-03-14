@@ -841,6 +841,23 @@ angular.module("umbraco").controller("UmbracoForms.Editors.Form.EntriesControlle
 	};
 
 	$scope.records = [];
+	recordResource.getRecordSetActions().then(function(response){
+		$scope.recordSetActions = response.data;
+		if(response.data.length == 2){
+			for(var ii = 0; ii < 2; ii++){
+				if(response.data[ii].name === 'Approve'){
+					$scope.approveBtn = response.data[ii];
+					
+				}else if(response.data[ii].name === 'Delete'){
+					$scope.deleteBtn = response.data[ii];
+					
+				}
+				
+			}
+			
+		}
+		
+	});
 
 	recordResource.getRecordSetActions().then(function(response){
 	    $scope.recordSetActions = response.data;
