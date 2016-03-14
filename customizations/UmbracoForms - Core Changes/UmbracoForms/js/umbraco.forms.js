@@ -2670,22 +2670,47 @@ angular.module("umbraco.directives")
             link: function (scope, element, attr, ctrl) {
 
                 scope.prevalues = [];
-
+				scope.editingPreValues = false;
                 ctrl.$render = function () {
                     if (Object.prototype.toString.call(ctrl.$viewValue) === '[object Array]') {
                         scope.prevalues = ctrl.$viewValue;
                     }
                 };
-
+				
+				scope.editPrevalues = function(field) {
+					scope.editingPreValues = scope.prevalues.indexOf(field);
+				}
+				scope.savePrevalueField = function(idx) {
+					if (scope.editingPreValues !== false) {
+						var elementUl = element.children("ul");
+						var elementLi = elementUl.children()[idx];
+						var elementInput = $(elementLi).find("input");
+						scope.prevalues[scope.editingPreValues] = elementInput.val();
+						scope.editingPreValues = false;
+						updateModel();
+					}  
+				};
+    
+				scope.cancelPrevalueField = function(idx) {
+					if (scope.editingPreValues !== false) {
+						var elementUl = element.children("ul");
+						var elementLi = elementUl.children()[idx];
+						var elementInput = $(elementLi).find("input");
+						elementInput.val(scope.prevalues[idx]);
+						scope.editingPreValues = false;
+					}       
+				};
                 scope.deletePrevalue = function (idx) {
                     scope.prevalues.splice(idx, 1);
                     updateModel();
                 };
 
                 scope.addPrevalue = function() {
-                    scope.prevalues.push(scope.newPrevalue);
-                    scope.newPrevalue = '';
-                    updateModel();
+					if(scope.prevalues.indexOf(scope.newPrevalue)){
+						scope.prevalues.push(scope.newPrevalue);
+						scope.newPrevalue = '';
+						updateModel();
+					}
                 };
 
                 function updateModel() {

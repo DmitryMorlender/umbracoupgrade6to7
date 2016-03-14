@@ -42,9 +42,19 @@
                             <strong>{{selectedRows.length}}</strong> entries selected
 
                             <div class="pull-right">
-
+								<!--
                                 <a href class="btn btn-link" ng-click="executeRecordSetAction(action)" title="{{action.description}}" ng-repeat="action in recordSetActions">
                                     <i class="icon {{action.icon}}" style="font-size: 16px"></i>
+                                </a>-->
+								<a href class="btn btn-link" ng-click="executeRecordSetAction(approveBtn)" title="{{approveBtn.description}}">
+                                    <i class="icon {{approveBtn.icon}}" style="font-size: 16px"></i>
+                                </a>
+								<span ng-if="deletePrompt">
+									 Are you sure?
+									 <a href style="text-decoration: underline" ng-click="executeRecordSetAction(deleteBtn)">Yes</a>
+								</span>
+								<a href class="btn btn-link" ng-click="deletePrompt = true" title="{{deleteBtn.description}}">
+                                    <i class="icon {{deleteBtn.icon}}" style="font-size: 16px"></i>
                                 </a>
                             </div>
                             <hr/>
