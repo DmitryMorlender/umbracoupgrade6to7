@@ -303,6 +303,12 @@ angular.module("umbraco")
             updatesResource.getUpdateStatus().then(function(response){
                 $scope.version = response.data;
             });
+
+            updatesResource.getVersion().then(function (response) {
+                $scope.currentVersion = response.data;
+            });
+
+
         };
 
         $scope.upgrade = function(){
@@ -322,26 +328,26 @@ angular.module("umbraco")
         $scope.loadStatus();
     });
 
-angular.module("umbraco")
-.controller("UmbracoForms.Dashboards.YourFormsController",
-    function ($scope, formResource, recordResource) {
+angular.module("umbraco").controller("UmbracoForms.Dashboards.YourFormsController", function ($scope,$location, formResource, recordResource, userService, securityResource) {
 
-            $scope.formsLimit = 4;
-            $scope.showAll = function(){
-                $scope.formsLimit = 50;
-            };
+    $scope.formsLimit = 4;
 
-            formResource.getOverView().then(function(response){
-                    $scope.forms = response.data;
+    $scope.showAll = function(){
+        $scope.formsLimit = 50;
+    };
 
-                    _.each($scope.forms, function(form){
-                            var filter = {form: form.id};
-                            recordResource.getRecordsCount(filter).then(function(response){
-                                    form.entries = response.data.count;
-                            });
-                    });
+    formResource.getOverView().then(function(response){
+        $scope.forms = response.data;
+
+        _.each($scope.forms, function(form){
+            var filter = { form: form.id };
+
+            recordResource.getRecordsCount(filter).then(function(response){
+                    form.entries = response.data.count;
             });
+        });
     });
+});
 
 angular.module("umbraco")
 .controller("UmbracoForms.Editors.DataSource.DeleteController",
@@ -359,25 +365,57 @@ angular.module("umbraco")
 	        navigationService.hideNavigation();
 	    };
 	});
-angular.module("umbraco").controller("UmbracoForms.Editors.DataSource.EditController",
-	function ($scope, $routeParams, dataSourceResource, editorState, notificationsService, dialogService, navigationService) {
-	    if ($routeParams.create) {
-	        //we are creating so get an empty data type item
-	        dataSourceResource.getScaffold()
-			.then(function (response) {
-			    $scope.loaded = true;
-			    $scope.dataSource = response.data;
+angular.module("umbraco").controller("UmbracoForms.Editors.DataSource.EditController", function ($scope, $routeParams, dataSourceResource, editorState, notificationsService, dialogService, navigationService, userService, securityResource) {
+    
+    if ($routeParams.create) {
+	    //we are creating so get an empty data type item
+	    dataSourceResource.getScaffold().then(function (response) {
+			$scope.loaded = true;
+			$scope.dataSource = response.data;
 
-			    dataSourceResource.getAllDataSourceTypesWithSettings()
-		        .then(function (resp) {
-		            $scope.types = resp.data;
+			dataSourceResource.getAllDataSourceTypesWithSettings()
+		    .then(function (resp) {
+		        $scope.types = resp.data;
 
-		        });
+		    });
 
-			    //set a shared state
-			    editorState.set($scope.form);
-			});
-	    } else {
+			//set a shared state
+			editorState.set($scope.form);
+		});
+    }
+    else {
+            
+        //On load/init of 'editing' a prevalue source then
+        //Let's check & get the current user's form security
+        var currentUserId = null;
+
+        userService.getCurrentUser().then(function (response) {
+            currentUserId = response.id;
+
+            //Now we can make a call to form securityResource
+            securityResource.getByUserId(currentUserId).then(function (response) {
+                $scope.security = response.data;
+
+                //Check if we have access to current form OR manage forms has been disabled
+                if (!$scope.security.userSecurity.manageDataSources) {
+
+                    //Show error notification
+                    notificationsService.error("Access Denied", "You do not have access to edit Datasources");
+
+                    //Resync tree so that it's removed & hides
+                    navigationService.syncTree({ tree: "datasource", path: ['-1'], forceReload: true, activate: false }).then(function (response) {
+
+                        //Response object contains node object & activate bool
+                        //Can then reload the root node -1 for this tree 'Forms Folder'
+                        navigationService.reloadNode(response.node);
+                    });
+
+                    //Don't need to wire anything else up
+                    return;
+                }
+            });
+        });
+
 	        //we are editing so get the content item from the server
 	        dataSourceResource.getByGuid($routeParams.id)
             .then(function (response) {
@@ -525,6 +563,37 @@ angular.module("umbraco")
             }
         }
 	});
+angular.module("umbraco").controller("UmbracoForms.Editors.Form.CopyController",function ($scope, formResource, navigationService) {
+
+    //console.log('currentNode', $scope.currentNode);
+    //console.log('currentNode parent', $scope.currentNode.parent());
+
+	    //Copy Function run from button on click
+	    $scope.copyForm = function (formId) {
+	        //console.log('Form ID to copy is'  + formId + 'with new name:' + $scope.newFormName);
+
+
+	        //Perform copy in formResource
+	        formResource.copy(formId, $scope.newFormName).then(function (response) {
+
+	            //console.log('response', response);
+	            //console.log('response.data', response.data);
+
+	            var newFormId = response.data.id;
+
+	            //Reload the tree (but do NOT mark the new item in the tree as selected/active)
+	            navigationService.syncTree({ tree: "form", path: ["-1", String(newFormId)], forceReload: true, activate: false });
+
+	            //Once 200 OK then reload tree & hide copy dialog navigation
+	            navigationService.hideNavigation();
+	        });
+	    };
+
+        //Cancel button - closes dialog
+        $scope.cancelCopy = function() {
+            navigationService.hideNavigation();
+        }
+	});
 angular.module("umbraco").controller("UmbracoForms.Editors.Form.CreateController",
 	function ($scope, $routeParams, formResource, editorState, notificationsService) {
 		formResource.getAllTemplates().then(function(response) {
@@ -549,8 +618,57 @@ angular.module("umbraco")
 	});
 angular.module("umbraco").controller("UmbracoForms.Editors.Form.EditController",
 
-function ($scope, $routeParams, formResource, editorState, dialogService, formService, notificationsService, contentEditingHelper, formHelper, navigationService) {
-	if ($routeParams.create) {
+function ($scope, $routeParams, formResource, editorState, dialogService, formService, notificationsService, contentEditingHelper, formHelper, navigationService, userService, securityResource) {
+    
+    //On load/init of 'editing' a form then
+    //Let's check & get the current user's form security
+    var currentUserId = null;
+    var currentFormSecurity = null;
+
+    //By default set to have access (in case we do not find the current user's per indivudal form security item)
+    $scope.hasAccessToCurrentForm = true;
+
+    userService.getCurrentUser().then(function (response) {
+        currentUserId = response.id;
+
+        //Now we can make a call to form securityResource
+        securityResource.getByUserId(currentUserId).then(function (response) {
+            $scope.security = response.data;
+
+            //Use _underscore.js to find a single item in the JSON array formsSecurity
+            //where the FORM guid matches the one we are currently editing (if underscore does not find an item it returns an empty array)
+            //As _.findWhere not in Umb .1.6 using _.where() that lists multiple matches - checking that we have only item in the array (ie one match)
+            currentFormSecurity = _.where(response.data.formsSecurity, { Form: $routeParams.id });
+
+            if (currentFormSecurity.length === 1) {
+                //Check & set if we have access to the form
+                //if we have no entry in the JSON array by default its set to true (so won't prevent)
+                $scope.hasAccessToCurrentForm = currentFormSecurity[0].HasAccess;
+            }
+
+            //Check if we have access to current form OR manage forms has been disabled
+            if (!$scope.hasAccessToCurrentForm || !$scope.security.userSecurity.manageForms) {
+
+                //Show error notification
+                notificationsService.error("Access Denied", "You do not have access to edit this form");
+
+
+                //Resync tree so that it's removed & hides
+                navigationService.syncTree({ tree: "form", path: ['-1'], forceReload: true, activate: false }).then(function(response) {
+
+                    //Response object contains node object & activate bool
+                    //Can then reload the root node -1 for this tree 'Forms Folder'
+                    navigationService.reloadNode(response.node);
+                });
+
+                //Don't need to wire anything else up
+                return;
+            }
+        });
+    });
+
+
+    if ($routeParams.create) {
 
 		//we are creating so get an empty data type item
 	    formResource.getScaffold($routeParams.template)
@@ -573,17 +691,23 @@ function ($scope, $routeParams, formResource, editorState, dialogService, formSe
 				editorState.set($scope.form);
 			});
 
-	} else {
+    } else {
 
 		$scope.workflowsUrl = "#/forms/form/workflows/" +$routeParams.id;
 		$scope.entriesUrl = "#/forms/form/entries/" +$routeParams.id;
 
+
 		//we are editing so get the content item from the server
 		formResource.getByGuid($routeParams.id)
-			.then(function(response){
+			.then(function (response) {
+
+			    //As we are editing an item we can highlight it in the tree
+			    navigationService.syncTree({ tree: "form", path: [String($routeParams.id)], forceReload: false });
+
+
 				$scope.form = response.data;
 				$scope.saved = true;
-
+                
 				formResource.getPrevalueSources()
 	                .then(function (resp) {
 	                    $scope.prevaluesources = resp.data;
@@ -597,8 +721,9 @@ function ($scope, $routeParams, formResource, editorState, dialogService, formSe
 
 				//set a shared state
 				editorState.set($scope.form);
-				navigationService.syncTree({ tree: "form", path: [String($scope.form.id)] });
 			});
+
+        
 	}
 
 	$scope.editForm = function(form, section){
@@ -613,43 +738,95 @@ function ($scope, $routeParams, formResource, editorState, dialogService, formSe
 
 	$scope.save = function(){
 
-		//make sure we set correct widths on all containers
-		formService.syncContainerWidths($scope.form);
+	    if (formHelper.submitForm({ scope: $scope })) {
+	        //make sure we set correct widths on all containers
+	        formService.syncContainerWidths($scope.form);
 
-		formResource.save($scope.form)
-			.then(function(response){
+	        formResource.save($scope.form).then(function (response) {
 
-				formHelper.resetForm({ scope: $scope });
+	            formHelper.resetForm({ scope: $scope });
 
-				contentEditingHelper.handleSuccessfulSave({
-					scope: $scope,
-					savedContent: response.data
-				});
+	            contentEditingHelper.handleSuccessfulSave({
+	                scope: $scope,
+	                savedContent: response.data
+	            });
 
-				$scope.ready = true;
-				//$scope.form = response.data;
+	            $scope.ready = true;
+	            //$scope.form = response.data;
 
-				//set a shared state
-				editorState.set($scope.form);
-				
-				navigationService.syncTree({ tree: "form", path: [String($scope.form.id)], forceReload: true });
+	            //set a shared state
+	            editorState.set($scope.form);
 
-				notificationsService.success("Form saved", "");
+	            navigationService.syncTree({ tree: "form", path: [String($scope.form.id)], forceReload: true });
 
-			},function(err){
-				notificationsService.error("Form Failed to save", err);
-			});
+	            notificationsService.success("Form saved", "");
+
+	        }, function (err) {
+	            notificationsService.error("Form Failed to save", err.data.Message);
+	        });
+	    }
+	    
 	};
+
 
 });
 
-angular.module("umbraco").controller("UmbracoForms.Editors.Form.EntriesController",
-	function($scope, $routeParams, recordResource, formResource, dialogService, editorState){
+angular.module("umbraco").controller("UmbracoForms.Editors.Form.EntriesController", function ($scope, $routeParams, recordResource, formResource, dialogService, editorState, userService, securityResource, notificationsService, navigationService) {
+
+    //On load/init of 'editing' a form then
+    //Let's check & get the current user's form security
+    var currentUserId = null;
+    var currentFormSecurity = null;
+
+    //By default set to have access (in case we do not find the current user's per indivudal form security item)
+    $scope.hasAccessToCurrentForm = true;
+
+    userService.getCurrentUser().then(function (response) {
+        currentUserId = response.id;
+
+        //Now we can make a call to form securityResource
+        securityResource.getByUserId(currentUserId).then(function (response) {
+            $scope.security = response.data;
+
+            //Use _underscore.js to find a single item in the JSON array formsSecurity 
+            //where the FORM guid matches the one we are currently editing (if underscore does not find an item it returns undefinied)
+            currentFormSecurity = _.where(response.data.formsSecurity, { Form: $routeParams.id });
+
+            if (currentFormSecurity.length === 1) {
+                //Check & set if we have access to the form
+                //if we have no entry in the JSON array by default its set to true (so won't prevent)
+                $scope.hasAccessToCurrentForm = currentFormSecurity[0].HasAccess;
+            }
+
+            //Check if we have access to current form OR manage forms has been disabled
+            if (!$scope.hasAccessToCurrentForm || !$scope.security.userSecurity.manageForms) {
+
+                //Show error notification
+		        notificationsService.error("Access Denied", "You do not have access to view this form's entries");
+
+                //Resync tree so that it's removed & hides
+                navigationService.syncTree({ tree: "form", path: ['-1'], forceReload: true, activate: false }).then(function (response) {
+
+                    //Response object contains node object & activate bool
+                    //Can then reload the root node -1 for this tree 'Forms Folder'
+                    navigationService.reloadNode(response.node);
+                });
+
+                //Don't need to wire anything else up
+                return;
+            }
+        });
+    });
+
 
 	formResource.getByGuid($routeParams.id)
 		.then(function(response){
 			$scope.form = response.data;
 			$scope.loaded = true;
+
+		    //As we are editing an item we can highlight it in the tree
+			navigationService.syncTree({ tree: "form", path: [String($routeParams.id), String($routeParams.id) + "_entries"], forceReload: false });
+
 		});
 
 	$scope.states = ["Approved", "Submitted"];
@@ -664,27 +841,12 @@ angular.module("umbraco").controller("UmbracoForms.Editors.Form.EntriesControlle
 	};
 
 	$scope.records = [];
-	recordResource.getRecordSetActions().then(function(response){
-		$scope.recordSetActions = response.data;
-		if(response.data.length == 2){
-			for(var ii = 0; ii < 2; ii++){
-				if(response.data[ii].name === 'Approve'){
-					$scope.approveBtn = response.data[ii];
-					
-				}else if(response.data[ii].name === 'Delete'){
-					$scope.deleteBtn = response.data[ii];
-					
-				}
-				
-			}
-			
-		}
-		
-	});
 
 	recordResource.getRecordSetActions().then(function(response){
-		$scope.recordActions = response.data;
+	    $scope.recordSetActions = response.data;
+	    $scope.recordActions = response.data;
 	});
+
 
 	$scope.toggleRecordStateSelection = function(recordState) {
 	    var idx = $scope.filter.states.indexOf(recordState);
@@ -826,12 +988,42 @@ angular.module("umbraco").controller("UmbracoForms.Editors.Form.EntriesControlle
 		}
 	};
 
-	$scope.executeRecordSetAction = function(action){
-		var model = {formId: $scope.form.id, recordKeys:$scope.selectedRows, actionId: action.id};
-		recordResource.executeRecordSetAction(model).then(function(response){
-			$scope.reset(true);
-			$scope.loadRecords($scope.filter, false);
-		});
+	$scope.executeRecordSetAction = function (action) {
+
+        //Get the data we need in order to send to the API Endpoint
+	    var model = {
+	        formId: $scope.form.id,
+	        recordKeys: $scope.selectedRows,
+	        actionId: action.id
+	    };
+
+	    //Check if the action we are running requires a JS Confirm Box along with a message to be displayed
+	    if (action.needsConfirm && action.confirmMessage.length > 0) {
+
+	        //Display the confirm box with the confirmMessage
+	        var result = confirm(action.confirmMessage);
+
+	        if (!result) {
+	            //The user clicked cancel
+	            //Stop the rest of the function running
+	            return;
+	        }
+	    }
+
+	    //We do not need to show a confirm message so excute the action immediately
+	    recordResource.executeRecordSetAction(model).then(function (response) {
+	        $scope.reset(true);
+	        $scope.loadRecords($scope.filter, false);
+
+	        //Show success notification that action excuted
+	        notificationsService.success("Excuted Action", "Successfully excuted action " + action.name);
+
+	    }, function (err) {
+	        //Error Function - so get an error response from API
+	        notificationsService.error("Excuted Action", "Failed to excute action " + action.name + " due to error: " + err);
+	    });
+
+	    
 	};
 });
 
@@ -903,25 +1095,69 @@ angular.module("umbraco").controller("UmbracoForms.Editors.Form.Dialogs.FieldSet
                 var key = setting.alias;
                 var value = setting.value;
                 $scope.dialogOptions.field.settings[key] = value;
-                
+                dialogService.closeAll();
             });
-			dialogService.closeAll();
         }
 	});
 
-angular.module("umbraco").controller("UmbracoForms.Editors.Form.WorkflowsController",
-    function ($scope, $routeParams, workflowResource, editorState, dialogService, $window) {
+angular.module("umbraco").controller("UmbracoForms.Editors.Form.WorkflowsController", function ($scope, $routeParams, workflowResource, editorState, dialogService, $window, userService, securityResource, notificationsService, navigationService) {
 
+       
+    //On load/init of 'editing' a form then
+    //Let's check & get the current user's form security
+        var currentUserId = null;
+        var currentFormSecurity = null;
 
+    //By default set to have access (in case we do not find the current user's per indivudal form security item)
+        $scope.hasAccessToCurrentForm = true;
+
+        userService.getCurrentUser().then(function (response) {
+            currentUserId = response.id;
+
+            //Now we can make a call to form securityResource
+            securityResource.getByUserId(currentUserId).then(function (response) {
+                $scope.security = response.data;
+
+                //Use _underscore.js to find a single item in the JSON array formsSecurity 
+                //where the FORM guid matches the one we are currently editing (if underscore does not find an item it returns undefinied)
+                currentFormSecurity = _.where(response.data.formsSecurity, { Form: $routeParams.id });
+
+                if (currentFormSecurity.length === 1) {
+                    //Check & set if we have access to the form
+                    //if we have no entry in the JSON array by default its set to true (so won't prevent)
+                    $scope.hasAccessToCurrentForm = currentFormSecurity[0].HasAccess;
+                }
+
+               //Check if we have access to current form OR manage forms has been disabled
+                if (!$scope.hasAccessToCurrentForm || !$scope.security.userSecurity.manageWorkflows || !$scope.security.userSecurity.manageForms) {
+                    
+                    //Show error notification
+                    notificationsService.error("Access Denied", "You do not have access to edit this form's workflow");
+
+                    //Resync tree so that it's removed & hides
+                    navigationService.syncTree({ tree: "form", path: ['-1'], forceReload: true, activate: false }).then(function (response) {
+
+                        //Response object contains node object & activate bool
+                        //Can then reload the root node -1 for this tree 'Forms Folder'
+                        navigationService.reloadNode(response.node);
+                    });
+
+                    //Don't need to wire anything else up
+                    return;
+                }
+            });
+        });
+        
         workflowResource.getAllWorkflows($routeParams.id)
             .then(function(resp) {
                 $scope.workflows = resp.data;
-				workflowResource.getFormByGuid($routeParams.id)
-					.then(function(response){
-						$scope.formName = response.data.name;
-						$scope.loaded = true;
-					});
-			});
+                $scope.loaded = true;
+
+                //As we are editing an item we can highlight it in the tree
+                navigationService.syncTree({ tree: "form", path: [String($routeParams.id), String($routeParams.id) + "_workflows"], forceReload: true });
+
+            });
+
         $scope.sortableOptions = {
             handle: '.handle',
             cursor: "move",
@@ -1138,6 +1374,38 @@ angular.module("umbraco").controller("UmbracoForms.Editors.Form.Dialogs.Workflow
 	        });
 	    };
 	});
+angular.module("umbraco").controller("UmbracoForms.Editors.Security.EditController", function ($scope, $routeParams, securityResource, notificationsService, navigationService) {
+
+    //Ensure the current item we are editing is highlighted in the tree
+    navigationService.syncTree({ tree: "formsecurity", path: [String($routeParams.id)], forceReload: true });
+
+    securityResource.getByUserId($routeParams.id).then(function (resp) {
+        $scope.security = resp.data;
+        $scope.loaded = true;
+    });
+
+    $scope.save = function () {
+        //Add a property to the object to save the Umbraco User ID taken from the routeParam
+        $scope.security.userSecurity.user = $routeParams.id;
+
+        securityResource.save($scope.security).then(function (response) {
+            $scope.userSecurity = response.data;
+            notificationsService.success("User's Form Security saved", "");
+
+            //SecurityForm is the name of the <form name='securitForm'>
+            //Set it back to Pristine after we save, so when we browse away we don't get the 'discard changes' notification
+            $scope.securityForm.$setPristine();
+
+        }, function (err) {
+            notificationsService.error("User's Form Security failed to save", "");
+        });
+
+    };
+
+});
+
+
+
 angular.module("umbraco")
 .controller("UmbracoForms.Editors.PreValueSource.DeleteController",
 	function ($scope, preValueSourceResource, navigationService, treeService) {
@@ -1154,9 +1422,8 @@ angular.module("umbraco")
 	        navigationService.hideNavigation();
 	    };
 	});
-angular.module("umbraco").controller("UmbracoForms.Editors.PreValueSource.EditController",
+angular.module("umbraco").controller("UmbracoForms.Editors.PreValueSource.EditController", function ($scope, $routeParams, preValueSourceResource, editorState, notificationsService, navigationService, userService, securityResource) {
 
-function ($scope, $routeParams, preValueSourceResource, editorState, notificationsService, navigationService) {
     if ($routeParams.create) {
         //we are creating so get an empty data type item
         preValueSourceResource.getScaffold()
@@ -1174,6 +1441,39 @@ function ($scope, $routeParams, preValueSourceResource, editorState, notificatio
 		    editorState.set($scope.form);
 		});
     } else {
+
+        //On load/init of 'editing' a prevalue source then
+        //Let's check & get the current user's form security
+        var currentUserId = null;
+
+        userService.getCurrentUser().then(function (response) {
+            currentUserId = response.id;
+
+            //Now we can make a call to form securityResource
+            securityResource.getByUserId(currentUserId).then(function (response) {
+                $scope.security = response.data;
+
+                //Check if we have access to current form OR manage forms has been disabled
+                if (!$scope.security.userSecurity.managePreValueSources) {
+
+                    //Show error notification
+                    notificationsService.error("Access Denied", "You do not have access to edit Prevalue sources");
+
+                    //Resync tree so that it's removed & hides
+                    navigationService.syncTree({ tree: "prevaluesource", path: ['-1'], forceReload: true, activate: false }).then(function (response) {
+
+                        //Response object contains node object & activate bool
+                        //Can then reload the root node -1 for this tree 'Forms Folder'
+                        navigationService.reloadNode(response.node);
+                    });
+
+                    //Don't need to wire anything else up
+                    return;
+                }
+            });
+        });
+
+
         //we are editing so get the content item from the server
         preValueSourceResource.getByGuid($routeParams.id)
         .then(function (response) {
@@ -1188,7 +1488,8 @@ function ($scope, $routeParams, preValueSourceResource, editorState, notificatio
                     $scope.loaded = true;
                 });
 
-            
+            //As we are editing an item we can highlight it in the tree
+            navigationService.syncTree({ tree: "prevaluesource", path: [String($routeParams.id)], forceReload: false });
            
             //set a shared state
             editorState.set($scope.preValueSource);
@@ -1271,23 +1572,149 @@ function ($scope, $routeParams, preValueSourceResource, editorState, notificatio
     };
 
 	});
-angular.module("umbraco").controller("UmbracoForms.FormPickerController",
-        function ($scope, $http, formResource) {
+angular.module("umbraco").controller("UmbracoForms.FormPickerController", function ($scope, $http, formResource) {
 
-            $scope.loading = true;
-            formResource.getOverView()
-                .then(function (response) {
-                    $scope.forms  = response.data;
-                    $scope.loading = false;
-                }, function(err){
-                    $scope.error = "An Error has occured while loading!";
-                    $scope.loading = false;
-                });
+    //Used to minipulate the Form Object we get back into the simpler form object needed here
+    function massageFormDataObject(form) {
 
-            $scope.clear = function () {
-                $scope.model.value = null;
+        var fields = [];
+        var fieldSummary = '';
+
+        //Not sure how to get these fields without this ugly nested loop?
+        //For each page in the object
+        for (var pageIndex = 0; pageIndex < form.pages.length; pageIndex++) {
+
+            //For each page it will have one or more fieldsets nested
+            for (var fieldsetIndex = 0; fieldsetIndex < form.pages[pageIndex].fieldSets.length; fieldsetIndex++)
+            {
+
+                //for each fieldset it will have a container
+                for (var containerIndex = 0; containerIndex < form.pages[pageIndex].fieldSets[fieldsetIndex].containers.length; containerIndex++)
+                {
+
+                    //For each container will have one or more fields
+                    for (var fieldIndex = 0; fieldIndex < form.pages[pageIndex].fieldSets[fieldsetIndex].containers[containerIndex].fields.length; fieldIndex++)
+                    {
+                        var field = form.pages[pageIndex].fieldSets[fieldsetIndex].containers[containerIndex].fields[fieldIndex];
+
+                        //Push the field we find into our new array of just fields only
+                        fields.push(field);
+                    }
+                }
             }
-        });
+        }
+
+        //Build up field summary
+        //Example: Name, Age, Location, Left column and one additional fields
+        //Example: Name, Age Location and Left column
+
+        var currentFieldItem = null;
+
+        //Check that we have 4 fields or less
+        if (fields.length <= 4) {
+
+            //Loop over first 4 items in fields array
+            for (var i = 0; i < fields.length; i++) {
+
+                //Get the current field object in the loop out of array
+                currentFieldItem = fields[i];
+
+                //Set the string fieldSummary with the name of the field aka caption
+                //If we are not the last item in the array prefix with a comma
+                //Otherwise it's an 'and
+                if (i !== fields.length - 1) {
+                    fieldSummary += currentFieldItem.caption;
+
+                    if (i !== fields.length - 2) {
+                        fieldSummary += ', ';
+                    }
+
+                }
+                else {
+                    fieldSummary += ' and ' + currentFieldItem.caption;
+                }
+            }
+        }
+        else {
+            //Loop over first four items & then append a count of the remaining fields we have
+            for (var x = 0; x < 4; x++) {
+
+                //Get the current field object in the loop out of array
+                currentFieldItem = fields[x];
+
+                //Set the string fieldSummary with the name of the field aka caption
+                fieldSummary += currentFieldItem.caption;
+
+                //If we are NOT the last item use a comma
+                //Otherwise it's a comma
+                if (x !== fields.length - 1) {
+                    fieldSummary += ', ';
+                }
+            }
+
+            //
+            //More than 4 records use - Name, Age, Location, Left column and one additional fiels
+            //TODO: Need to use word numbers :'(
+            var countExtraFields = fields.length - 4;
+            fieldSummary += 'and ' + countExtraFields + ' additional fields';
+        }
+
+        var pages = form.pages.length;
+        var summary = pages + ' page form with ' + fields.length + ' fields';
+
+        return {
+            id: form.id,
+            name: form.name,
+            fields: fieldSummary,
+            summary: summary,
+            workflows: form.workflows.length
+        };
+    };
+
+    $scope.loading = true;
+    var selectedForm = null;
+
+    formResource.getOverView().then(function (response) {
+        $scope.forms  = response.data;
+        $scope.loading = false;
+        
+        //Only do this is we have a value saved
+        if ($scope.model.value) {
+
+            //Try & find picked form from 'model.value' that we save as a 
+            //simple GUID out of the collection in forms with _underscore
+            selectedForm = _.where(response.data, { id: $scope.model.value });
+
+            if (selectedForm.length === 1) {
+                //Found the form from the API (means we currently have access to it)
+                $scope.pickedFormName = selectedForm[0].name;
+            } else {
+                //We have a GUID in model.value saved but it did not come back from the overview API response
+                //So this means we do not have access to it, but need to show the form name in the UI
+
+                //Go fetch that specific form by the GUID we have saved
+                formResource.getByGuid($scope.model.value).then(function (response) {
+
+                    var form = response.data;
+
+                    //Add the form to the collection of forms - change to same format as API response
+                    //Push the item into the array/collection of forms so it can still be selected as a radio button option
+                    var formToPush = massageFormDataObject(form);
+                    $scope.forms.push(formToPush);
+                });
+            }
+        }
+
+    },
+    function (err) {
+        $scope.error = "An Error has occured while loading!";
+        $scope.loading = false;
+    });
+
+    $scope.clear = function () {
+        $scope.model.value = null;
+    }
+});
 
 function dataSourceResource($http) {
 
@@ -1417,6 +1844,10 @@ function formResource($http) {
         },
         getPrevalueSources: function() {
             return $http.get(apiRoot + "GetPrevalueSources");
+        },
+
+        copy: function(id, newFormName) {
+            return $http.post(apiRoot + "CopyForm", { guid: id, newName: newFormName });
         }
     };
 }
@@ -1557,6 +1988,21 @@ function recordResource($http) {
 
 angular.module('umbraco.resources').factory('recordResource', recordResource);
 
+function securityResource($http) {
+
+    var apiRoot = "backoffice/UmbracoForms/FormSecurity/";
+
+    return {
+        getByUserId: function (userId) {
+            return $http.get(apiRoot + "GetByUserId?userId=" + userId);
+        },
+        save: function (userSecurity) {
+            return $http.post(apiRoot + "PostSave", userSecurity);
+        }
+    };
+}
+
+angular.module('umbraco.resources').factory('securityResource', securityResource);
 /**
     * @ngdoc service
     * @name umbraco.resources.dashboardResource
@@ -1573,6 +2019,10 @@ function updatesResource($http) {
 
         installLatest: function (version) {
             return $http.get(apiRoot + "InstallLatest?version=" + version);
+        },
+
+        getVersion: function() {
+            return $http.get(apiRoot + "GetVersion");
         }
     };
 }
@@ -1582,7 +2032,6 @@ angular.module('umbraco.resources').factory('updatesResource', updatesResource);
 function workflowResource($http) {
 
     var apiRoot = "backoffice/UmbracoForms/Workflow/";
-	var apiFormRoot = "backoffice/UmbracoForms/Form/";
 
     return {
 
@@ -1593,9 +2042,6 @@ function workflowResource($http) {
         getByGuid: function (id) {
             return $http.get(apiRoot + "GetByGuid?guid=" + id);
         },
-		getFormByGuid: function(id) {
-			return $http.get(apiFormRoot + "GetByGuid?guid=" + id);
-		},
         deleteByGuid: function (id) {
             return $http.delete(apiRoot + "DeleteByGuid?guid=" + id);
         },
@@ -2115,6 +2561,7 @@ angular.module("umbraco.directives")
                 // *********************************************
 
                 scope.editForm = function (form, section) {
+                    dialogService.closeAll();
                     dialogService.open(
                         {
                             template: "/app_plugins/UmbracoForms/Backoffice/Form/dialogs/formsettings.html",
@@ -2223,51 +2670,25 @@ angular.module("umbraco.directives")
             link: function (scope, element, attr, ctrl) {
 
                 scope.prevalues = [];
-				scope.editingPreValues = false;
+
                 ctrl.$render = function () {
                     if (Object.prototype.toString.call(ctrl.$viewValue) === '[object Array]') {
                         scope.prevalues = ctrl.$viewValue;
                     }
                 };
-				
-				scope.editPrevalues = function(field) {
-					scope.editingPreValues = scope.prevalues.indexOf(field);
-				}
-				scope.savePrevalueField = function(idx) {
-					if (scope.editingPreValues !== false) {
-						var elementUl = element.children("ul");
-						var elementLi = elementUl.children()[idx];
-						var elementInput = $(elementLi).find("input");
-						scope.prevalues[scope.editingPreValues] = elementInput.val();
-						scope.editingPreValues = false;
-						updateModel();
-					}  
-				};
-    
-				scope.cancelPrevalueField = function(idx) {
-					if (scope.editingPreValues !== false) {
-						var elementUl = element.children("ul");
-						var elementLi = elementUl.children()[idx];
-						var elementInput = $(elementLi).find("input");
-						elementInput.val(scope.prevalues[idx]);
-						scope.editingPreValues = false;
-					}       
-				};
+
                 scope.deletePrevalue = function (idx) {
                     scope.prevalues.splice(idx, 1);
                     updateModel();
                 };
 
                 scope.addPrevalue = function() {
-					if(scope.prevalues.indexOf(scope.newPrevalue)){
-						scope.prevalues.push(scope.newPrevalue);
-						scope.newPrevalue = '';
-						updateModel();
-					}
+                    scope.prevalues.push(scope.newPrevalue);
+                    scope.newPrevalue = '';
+                    updateModel();
                 };
 
                 function updateModel() {
-					
                     ctrl.$setViewValue(scope.prevalues);
                 }
             }

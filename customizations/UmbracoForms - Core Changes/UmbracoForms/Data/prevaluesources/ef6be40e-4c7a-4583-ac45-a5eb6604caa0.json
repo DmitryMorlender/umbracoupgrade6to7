@@ -1,8 +1,0 @@
-{
-  "id": "ef6be40e-4c7a-4583-ac45-a5eb6604caa0",
-  "name": "School List",
-  "settings": {
-    "TextFile": "/media/1002/schools.txt"
-  },
-  "fieldPreValueSourceTypeId": "35c2053e-cbf7-4793-b27c-6e97b7671a2d"
-}
