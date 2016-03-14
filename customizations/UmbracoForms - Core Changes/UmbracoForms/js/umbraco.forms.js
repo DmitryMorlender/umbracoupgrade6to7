@@ -2697,14 +2697,19 @@ angular.module("umbraco.directives")
 				scope.editPrevalues = function(field) {
 					scope.editingPreValues = scope.prevalues.indexOf(field);
 				}
+				
 				scope.savePrevalueField = function(idx) {
 					if (scope.editingPreValues !== false) {
 						var elementUl = element.children("ul");
 						var elementLi = elementUl.children()[idx];
 						var elementInput = $(elementLi).find("input");
-						scope.prevalues[scope.editingPreValues] = elementInput.val();
-						scope.editingPreValues = false;
-						updateModel();
+						//has to be zero
+						if(scope.prevalues.indexOf(elementInput.val()) < 1){
+							scope.prevalues[scope.editingPreValues] = elementInput.val();
+							scope.editingPreValues = false;
+							updateModel();
+						}
+						elementInput.val(scope.prevalues[scope.editingPreValues]);
 					}  
 				};
     
@@ -2723,7 +2728,10 @@ angular.module("umbraco.directives")
                 };
 
                 scope.addPrevalue = function() {
-					if(scope.prevalues.indexOf(scope.newPrevalue)){
+					//do not add if duplicate is found. must have an alert error message
+					console.log(scope.newPrevalue);
+					console.log(scope.prevalues.indexOf(scope.newPrevalue));
+					if(scope.prevalues.indexOf(scope.newPrevalue) < 1 && scope.newPrevalue !== ''){
 						scope.prevalues.push(scope.newPrevalue);
 						scope.newPrevalue = '';
 						updateModel();
@@ -2731,7 +2739,7 @@ angular.module("umbraco.directives")
                 };
 
                 function updateModel() {
-                    ctrl.$setViewValue(scope.prevalues);
+					ctrl.$setViewValue(scope.prevalues);
                 }
             }
         };
