@@ -458,7 +458,9 @@ IFRAME {
 .usky-grid .tb:hover .usky-row {
   border-bottom: 1px dashed rgba(182, 182, 182, 0.3);
 }
-/*.usky-grid .selectedRow {     border: 1px solid rgba(182, 182, 182, 0.3);}*/
+/*.usky-grid .selectedRow {
+     border: 1px solid rgba(182, 182, 182, 0.3);
+}*/
 .usky-grid .usky-cell {
   position: relative;
   border: 1px dashed rgba(0, 0, 0, 0);
@@ -515,10 +517,15 @@ IFRAME {
   right: 5px;
 }
 .usky-grid .usky-control {
-  /*transition: all .20s ease-in-out;    -moz-transition: all .20s ease-in-out;    -webkit-transition: all .20s ease-in-out;*/
+  /*transition: all .20s ease-in-out;
+    -moz-transition: all .20s ease-in-out;
+    -webkit-transition: all .20s ease-in-out;*/
   position: relative;
   display: block;
-  /*    border: 1px dashed rgba(255, 0, 0, .0);    border-bottom-width: 1px;    */
+  /*
+    border: 1px dashed rgba(255, 0, 0, .0);
+    border-bottom-width: 1px;
+    */
   -webkit-background-clip: padding-box;
   /* for Safari */
   background-clip: padding-box;
@@ -1025,3 +1032,10 @@ IFRAME {
 .inactive {
   color: #d9d9d9;
 }
+
+/**custom**/
+.prevalue-list li{line-height: 28px;}
+.prevalue-list li .prevalue-form{margin: 0; position: relative; top: -27px;}
+	.prevalue-list li .prevalue-form a i{font-size: 22px;}
+	.prevalue-list li .btn{position: relative; top: -5px;}
+.prevalue-form .btn{position: relative; top: -5px;}

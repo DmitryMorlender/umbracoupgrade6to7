@@ -1,10 +1,20 @@
 ﻿<div>
-    <ul>
-        <li ng-repeat="prevalue in prevalues">{{prevalue}}
-            <a ng-click="deletePrevalue($index)" title="Delete"><i class="icon-trash"></i></a>
+    <ul class="prevalue-list">
+        <li ng-repeat="prevalue in prevalues">
+			<span ng-hide="editMode">{{prevalue}}</span>
+            <input type="text" ng-show="editMode" ng-required value="{{prevalue}}" />
+            <button type="submit" ng-show="editMode" ng-click="editMode = false; savePrevalueField($index)" class="btn btn-default">Save</button>
+            <button type="submit" ng-show="editMode" ng-click="editMode = false; cancelPrevalueField($index)" class="btn btn-cancel">Cancel</button>
+			<a ng-hide="editMode" ng-click="editMode = true; editPrevalues(prevalue)" title="Edit"><i class="icon-edit"></i></a>
+			<span ng-if="deletePrompt" ng-hide="editMode">
+				Are you sure?
+				<a href ng-click="deletePrevalue($index)">Yes</a>
+			</span>
+			<a href ng-hide="editMode || !deletePrompt" ng-click="deletePrompt = false">Cancel</a>
+            <a ng-hide="editMode" ng-click="deletePrompt = true" title="Delete"><i class="icon-trash"></i></a>
         </li>
     </ul>
-    <form ng-submit="addPrevalue()">
+    <form ng-submit="addPrevalue()" class="prevalue-form">
         <input type="text" ng-model="newPrevalue" size="30"
                placeholder="add new prevalue here">
         <input class="btn" type="submit" value="add">
