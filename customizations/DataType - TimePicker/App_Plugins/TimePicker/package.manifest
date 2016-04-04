@@ -1,0 +1,16 @@
+{
+	propertyEditors: [
+		{
+			alias: "Umbraco.TimePicker",
+			name: "TimePicker",
+			isParameterEditor: true,
+			editor: {
+				view: "~/App_Plugins/TimePicker/TimePicker.html"
+			},
+		}
+	],
+    //array of files we want to inject into the application on app_start
+    javascript: [
+        '~/App_Plugins/TimePicker/TimePicker.controller.js'
+    ]
+}
